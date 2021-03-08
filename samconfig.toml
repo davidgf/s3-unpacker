@@ -1,0 +1,10 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "s3-unpacker"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-iwui3zxaq105"
+s3_prefix = "s3-unpacker"
+region = "eu-west-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"

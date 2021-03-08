@@ -1,0 +1,24 @@
+{
+    "name": "replaced-by-user-input",
+    "description": "replaced-by-user-input",
+    "version": "0.0.1",
+    "private": true,
+    "dependencies": {
+        "adm-zip": "^0.5.3",
+        "node-stream-zip": "^1.13.2",
+        "p-all": "^3.0.0",
+        "p-map": "^4.0.0",
+        "unzipper": "^0.10.11",
+        "yauzl": "^2.10.0"
+    },
+    "devDependencies": {
+        "aws-sdk": "^2.857.0",
+        "jest": "^26.6.3",
+        "standard": "^16.0.3"
+    },
+    "scripts": {
+        "test": "jest",
+        "perf-test": "node ./scripts/extractTests",
+        "s3-test": "time node ./scripts/extractTestsS3Local"
+    }
+}
