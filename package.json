@@ -5,6 +5,7 @@
     "private": true,
     "dependencies": {
         "adm-zip": "^0.5.3",
+        "bluebird": "^3.4.7",
         "node-stream-zip": "^1.13.2",
         "p-all": "^3.0.0",
         "p-map": "^4.0.0",

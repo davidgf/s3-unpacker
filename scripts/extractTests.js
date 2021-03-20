@@ -3,6 +3,13 @@ const unzipper = require('unzipper')
 const yauzl = require('yauzl')
 const AdmZip = require('adm-zip')
 const { argv } = require('yargs')
+const os = require('os')
+const execSync = require('child_process').execSync
+
+const getTmpDirectory = () => {
+  return os.tmpdir()
+}
+
 
 const unzipperBuffer = (filePath) => {
   console.log('STRATEGY: unzipperBuffer')
@@ -11,10 +18,10 @@ const unzipperBuffer = (filePath) => {
     .on('entry', function (entry) {
       const type = entry.type
       if (type === 'File') {
-        entry.pipe(fs.createWriteStream(`/tmp/test/${entry.path}`))
+        entry.pipe(fs.createWriteStream(`${getTmpDirectory()}/test/${entry.path}`))
       } else {
-        if (!fs.existsSync(`/tmp/test/${entry.path}`)) {
-          fs.mkdirSync(`/tmp/test/${entry.path}`)
+        if (!fs.existsSync(`${getTmpDirectory()}/test/${entry.path}`)) {
+          fs.mkdirSync(`${getTmpDirectory()}/test/${entry.path}`)
         }
         entry.autodrain()
       }
@@ -29,8 +36,8 @@ const unzipperStream = async (filePath) => {
   const promises = directory.files.map(file => {
     return new Promise((resolve, reject) => {
       if (file.type === 'Directory') {
-        if (!fs.existsSync(`/tmp/test/${file.path}`)) {
-          fs.mkdirSync(`/tmp/test/${file.path}`)
+        if (!fs.existsSync(`${getTmpDirectory()}/test/${file.path}`)) {
+          fs.mkdirSync(`${getTmpDirectory()}/test/${file.path}`)
         }
         resolve()
         // try {
@@ -42,7 +49,7 @@ const unzipperStream = async (filePath) => {
       } else {
         file
           .stream()
-          .pipe(fs.createWriteStream(`/tmp/test/${file.path}`))
+          .pipe(fs.createWriteStream(`${getTmpDirectory()}/test/${file.path}`))
           .on('error', reject)
           .on('finish', resolve)
       }
@@ -59,8 +66,8 @@ const yauzlStream = async (filePath) => {
       zipFile.readEntry()
       zipFile.on('entry', function (entry) {
         if (/\/$/.test(entry.fileName)) {
-          if (!fs.existsSync(`/tmp/test/${entry.fileName}`)) {
-            fs.mkdirSync(`/tmp/test/${entry.fileName}`)
+          if (!fs.existsSync(`${getTmpDirectory()}/test/${entry.fileName}`)) {
+            fs.mkdirSync(`${getTmpDirectory()}/test/${entry.fileName}`)
           }
           zipFile.readEntry()
         } else {
@@ -69,7 +76,7 @@ const yauzlStream = async (filePath) => {
             readStream.on('end', function () {
               zipFile.readEntry()
             })
-            readStream.pipe(fs.createWriteStream(`/tmp/test/${entry.fileName}`))
+            readStream.pipe(fs.createWriteStream(`${getTmpDirectory()}/test/${entry.fileName}`))
           })
         }
       })
@@ -104,6 +111,7 @@ const strategies = {
 }
 
 async function main (strategy, filePath) {
+  execSync(`mkdir -p ${getTmpDirectory()}/test/`)
   displayMemoryUsage()
   await strategies[strategy](filePath)
   displayMemoryUsage()

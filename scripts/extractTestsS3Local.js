@@ -4,6 +4,7 @@ const { argv } = require('yargs')
 const pMap = require('p-map')
 const { promisify } = require('util')
 const { S3 } = require('aws-sdk')
+const BPromise = require('bluebird')
 
 const s3Client = new S3({
   accessKeyId: 'minioadmin',
@@ -135,11 +136,49 @@ function displayMemoryUsage () {
   console.log('Total memory allocated for the process execution: ', formatMemoryUsage(memoryData.rss))
 }
 
+const unzs2 = async (zipFileKey) => {
+  console.log('UNZS2: grabbing file')
+  const directory = await unzipper.Open.s3(s3Client, { Bucket: inputBucketName, Key: zipFileKey })
+  const outputFolder = generateUnpackBasePath(zipFileKey)
+
+  return BPromise.map(directory.files, entry => {
+    return new Promise((resolve, reject) => {
+      const type = entry.type
+      if (type !== 'File') return Promise.resolve(true)
+      const body = entry.stream()
+
+      // body.on('data', (chunk) => {
+      //   console.log(`Received ${chunk.length} bytes of data.`);
+      // })
+
+      // execSync(`mkdir -p ./tmp/${composedPath}`)
+
+      // r = body.pipe(fs.createWriteStream(`./tmp/${entry.path}`))
+      //   .on('data', console.log)
+      //   .on('error', resolve)
+      //   .on('finish', resolve)
+
+      const uploadParams = {
+        Bucket: outputBucketName,
+        Key: `${outputFolder}${entry.path}`,
+        Body: body
+      }
+
+      s3Client.upload(uploadParams, function (err, data) {
+        if (err) resolve()
+        console.log('Uploaded the file at', data.Location)
+        resolve()
+      })
+    })
+  }, { concurrency: 10 })
+}
+
 const strategies = {
   unz,
   unzb,
   unzs,
-  yau
+  yau,
+  unzs2
 }
 
 async function main (strategy, fileKey) {
