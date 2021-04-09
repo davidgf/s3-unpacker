@@ -11,7 +11,11 @@ const s3Client = new S3({
   secretAccessKey: 'minioadmin',
   endpoint: 'http://127.0.0.1:9000',
   s3ForcePathStyle: true,
-  signatureVersion: 'v4'
+  signatureVersion: 'v4',
+  maxRetries: 30,
+  httpOptions: {
+    timeout: 20 * 3600 * 1000
+  }
 })
 
 const inputBucketName = 'input'
@@ -138,25 +142,18 @@ function displayMemoryUsage () {
 
 const unzs2 = async (zipFileKey) => {
   console.log('UNZS2: grabbing file')
+
   const directory = await unzipper.Open.s3(s3Client, { Bucket: inputBucketName, Key: zipFileKey })
   const outputFolder = generateUnpackBasePath(zipFileKey)
 
+  let count = 0
   return BPromise.map(directory.files, entry => {
     return new Promise((resolve, reject) => {
+      console.log('Processing: ', entry.path)
       const type = entry.type
-      if (type !== 'File') return Promise.resolve(true)
+      if (type !== 'File') resolve()
       const body = entry.stream()
-
-      // body.on('data', (chunk) => {
-      //   console.log(`Received ${chunk.length} bytes of data.`);
-      // })
-
-      // execSync(`mkdir -p ./tmp/${composedPath}`)
-
-      // r = body.pipe(fs.createWriteStream(`./tmp/${entry.path}`))
-      //   .on('data', console.log)
-      //   .on('error', resolve)
-      //   .on('finish', resolve)
+      count += 1
 
       const uploadParams = {
         Bucket: outputBucketName,
@@ -165,12 +162,19 @@ const unzs2 = async (zipFileKey) => {
       }
 
       s3Client.upload(uploadParams, function (err, data) {
-        if (err) resolve()
+        if (err) {
+          console.log(err)
+          reject(err)
+        }
         console.log('Uploaded the file at', data.Location)
         resolve()
       })
     })
-  }, { concurrency: 10 })
+  }, { concurrency: 2 }).then(() => {
+    console.log(`uploaded ${count} files`)
+  }).catch(error => {
+    console.log(error)
+  })
 }
 
 const strategies = {
