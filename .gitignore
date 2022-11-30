@@ -1,0 +1,7 @@
+node_modules
+unpacker_test.ods
+.vscode
+samconfig.toml
+.aws-sam
+packaged.yaml
+packaged.yml

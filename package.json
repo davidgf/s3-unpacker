@@ -1,0 +1,15 @@
+{
+    "name": "s3-unpacker",
+    "description": "Unzip files automatically on S3",
+    "version": "1.0.0",
+    "dependencies": {
+        "unzipper": "github:ZJONSSON/node-unzipper#341f258"
+    },
+    "devDependencies": {
+        "aws-sdk": "^2.857.0",
+        "standard": "^16.0.3"
+    },
+    "scripts": {
+        "s3-test": "time node ./scripts/extractTestsS3Local"
+    }
+}

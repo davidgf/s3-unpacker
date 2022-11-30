@@ -1,0 +1,122 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  S3 Unpacker automatically extracts zip files as they are created in an S3 bucket.
+Transform: "AWS::Serverless-2016-10-31"
+
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: s3-unpacker
+    Description: Automatically unzip files from S3 buckets.
+    Author: David Garcia
+    SemanticVersion: 1.0.0
+    HomePageUrl: https://github.com/davidgf/s3-unpacker
+    SourceCodeUrl: https://github.com/davidgf/s3-unpacker
+    SpdxLicenseId: ISC
+    LicenseUrl: LICENSE
+    ReadmeUrl: README.md
+    Labels: ['zip', 'unzip', 's3', 'extract', 'uncompress']
+
+Parameters:
+  IncomingFilesBucketName:
+    Type: String
+    Description: Name of the bucket where the zip files will be uploaded. A new bucket with this name will be created, so it cannot exist.
+
+  TargetBucketName:
+    Type: String
+    Description: Name of the bucket where the files should be extracted to. This bucket will not be created, it must exist.
+
+  ExtractFileFunctionMemory:
+    Type: Number
+    Description: |
+      The amount of memory available to the Lambda extract file function.
+    MinValue: 128
+    MaxValue: 10240
+    Default: 128
+
+  ExtractFileFunctionReservedConcurrency:
+    Type: Number
+    Description: |
+      Reserved concurrency for the Lambda extract file function. It also acts as a limit, preventing
+      the consumption of the full region capacity.
+    MinValue: 0
+    Default: 50
+
+Resources:
+  IncomingFilesBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Ref IncomingFilesBucketName
+
+  ExtractFileDlq:
+    Type: AWS::SQS::Queue
+    Properties:
+      VisibilityTimeout: 900
+
+  ExtractFile:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: A Lambda function that extracts a zip file
+      Runtime: nodejs16.x
+      Handler: src/handlers/extractFile.handler
+      MemorySize: !Ref ExtractFileFunctionMemory
+      Timeout: 900
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref IncomingFilesBucketName
+        - S3WritePolicy:
+            BucketName: !Ref TargetBucketName
+      Environment:
+        Variables:
+          OUTPUT_BUCKET: !Ref TargetBucketName
+      Events:
+        S3Event:
+          Type: S3
+          Properties:
+            Bucket: !Ref IncomingFilesBucket
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: suffix
+                    Value: .zip
+      DeadLetterQueue:
+        Type: SQS
+        TargetArn: !GetAtt ExtractFileDlq.Arn
+      ReservedConcurrentExecutions: !Ref ExtractFileFunctionReservedConcurrency
+
+  ExtractFileDlqAlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: s3-unpacker-extract-file-dlq-alert-topic
+
+  ExtractFileDlqAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: s3-unpacker-extract-file-dlq-alarm
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt ExtractFileDlq.QueueName
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: 
+        - !Ref ExtractFileDlqAlertTopic
+
+Outputs:
+  IncomingFilesBucketName:
+    Description: Name of the bucket where files to be extracted are expected.
+    Value: !Ref IncomingFilesBucket
+
+  ExtractFileDlqUrl:
+    Description: URL of the queue where failed file extractions are sent to.
+    Value: !Ref ExtractFileDlq
+
+  ExtractFileDlqAlertTopicArn:
+    Description: ARN of the SNS topic where file extract DLQ alerts are sent to.
+    Value: !Ref ExtractFileDlqAlertTopic
